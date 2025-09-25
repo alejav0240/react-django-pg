@@ -1,0 +1,55 @@
+version: "3.9"
+
+volumes:
+  pg_data:
+
+services:
+  db:
+    image: postgres:15
+    container_name: pgDB
+    environment:
+      POSTGRES_DB: prueba_db
+      POSTGRES_USER: prueba_user
+      POSTGRES_PASSWORD: prueba_pass
+    volumes:
+      - pg_data:/var/lib/postgres/datanpm
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+  api:
+    build: ./api
+    container_name: djangoApi
+    volumes:
+      - ./api:/app
+    ports:
+      - "8000:8000"      
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      DB_NAME: appdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres_db
+      DB_PORT: 5432
+    depends_on:
+      - db
+  web:
+    build: ./web
+    container_name: reactWeb
+    ports: 
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+  mobile:
+    build: ./mobile
+    container_name: reactApp
+    volumes:
+      - ./mobile:/app
+      - /app/node_modules
+    ports:
+      - "19006:19006"   # Expo web
+      - "8081:8081"     # Metro Bundler
+    command: ["npx", "expo", "start", "--host", "lan"]
