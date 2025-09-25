@@ -1,21 +1,46 @@
-version: "3.9"
+# 🚫 Quitar 'version': ya no se usa en Compose v2
+# version: "3.9"
 
 volumes:
   pg_data:
+
+networks:
+  frontend_net:
+  backend_net:
+  db_net:
 
 services:
   db:
     image: postgres:15
     container_name: pgDB
     environment:
-      POSTGRES_DB: prueba_db
-      POSTGRES_USER: prueba_user
-      POSTGRES_PASSWORD: prueba_pass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - pg_data:/var/lib/postgres/datanpm
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pg_data:/var/lib/postgresql/data   # 🔧 corregido path (antes estaba mal escrito)
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
+    networks:
+      - backend_net
+      - db_net
+    restart: unless-stopped
+
+  db_admin:
+    image: dpage/pgadmin4
+    container_name: pgDB_admin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - db_net
+    restart: unless-stopped
+
   api:
     build: ./api
     container_name: djangoApi
@@ -25,13 +50,21 @@ services:
       - "8000:8000"      
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     environment:
-      DB_NAME: appdb
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: postgres_db
-      DB_PORT: 5432
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
     depends_on:
       - db
+    networks:
+      - backend_net
+      - frontend_net
+    restart: unless-stopped
+
   web:
     build: ./web
     container_name: reactWeb
@@ -43,6 +76,12 @@ services:
     depends_on:
       - api
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    networks:
+      - frontend_net
+    restart: unless-stopped
+
   mobile:
     build: ./mobile
     container_name: reactApp
@@ -53,3 +92,23 @@ services:
       - "19006:19006"   # Expo web
       - "8081:8081"     # Metro Bundler
     command: ["npx", "expo", "start", "--host", "lan"]
+    environment:
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: ${EXPO_DEVTOOLS_LISTEN_ADDRESS}
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME}
+    networks:
+      - frontend_net
+    restart: unless-stopped
+
+  jupyter:
+    image: jupyter/base-notebook:latest
+    container_name: jupyter_notebook
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+    environment:
+      JUPYTER_ENABLE_LAB: ${JUPYTER_ENABLE_LAB}
+      TZ: ${TZ}
+    networks:
+      - backend_net
+    restart: unless-stopped
