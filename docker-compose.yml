@@ -91,7 +91,13 @@ services:
     ports:
       - "19006:19006"   # Expo web
       - "8081:8081"     # Metro Bundler
-    command: ["npx", "expo", "start", "--host", "lan"]
+      - "19000:19000"   
+      - "19001:19001"   # Expo web
+      - "19002:19002"   # Expo web
+      - "19003:19003"   # Expo web
+
+    command: ["npx", "expo", "start", "--tunnel"]
+    #command: tail -f /dev/null
     environment:
       EXPO_DEVTOOLS_LISTEN_ADDRESS: ${EXPO_DEVTOOLS_LISTEN_ADDRESS}
       REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME}
